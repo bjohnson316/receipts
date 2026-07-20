@@ -15,6 +15,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { utf8ToBase64, base64ToUtf8, ghCheckAccess, ghGetFile, ghPutFile, ghDeleteFile } from "./github.js";
+import { jsPDF } from "jspdf";
+import { autoTable } from "jspdf-autotable";
 
 const CATEGORIES = [
   { name: "Meals", color: "#4C7A5E" },
@@ -59,6 +61,34 @@ function categoryColor(name) {
 function imageSrc(image) {
   if (!image) return null;
   return typeof image === "string" ? image : image.url;
+}
+
+/** Loads any image URL (data: URL or remote) into a JPEG data URL plus its natural size, via canvas. */
+function loadImageMeta(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+        resolve({ dataUrl, width: img.naturalWidth, height: img.naturalHeight });
+      } catch (e) {
+        reject(e);
+      }
+    };
+    img.onerror = () => reject(new Error("Could not load image"));
+    img.src = src;
+  });
+}
+
+function fitDims(naturalW, naturalH, maxW, maxH) {
+  const scale = Math.min(maxW / naturalW, maxH / naturalH);
+  return { w: naturalW * scale, h: naturalH * scale };
 }
 
 function compressImage(file) {
@@ -122,6 +152,8 @@ export default function App() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [imgLoading, setImgLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
   const fileInputRef = useRef(null);
 
   const ghConnected = ghStatus === "connected";
@@ -277,8 +309,141 @@ export default function App() {
   const periodStart = sortedDates[0];
   const periodEnd = sortedDates[sortedDates.length - 1];
 
-  function handleExport() {
-    window.print();
+  async function handleExport() {
+    if (receipts.length === 0 || exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const PAGE_W = 595.28;
+      const PAGE_H = 841.89;
+      const MARGIN = 40;
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+
+      // Header
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.setTextColor(29, 43, 54);
+      doc.text("Expense Report", MARGIN, 50);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(92, 107, 116);
+      let metaText = "Generated " + new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      if (periodStart) metaText += `  ·  Period ${formatDateDisplay(periodStart)} – ${formatDateDisplay(periodEnd)}`;
+      doc.text(metaText, MARGIN, 66);
+
+      doc.setDrawColor(29, 43, 54);
+      doc.setLineWidth(1.2);
+      doc.line(MARGIN, 78, PAGE_W - MARGIN, 78);
+
+      // Table
+      const rows = receipts
+        .slice()
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((r) => [formatDateDisplay(r.date), r.vendor, r.category, r.notes || "", formatMoney(r.amount)]);
+
+      autoTable(doc, {
+        startY: 92,
+        head: [["Date", "Vendor", "Category", "Notes", "Amount"]],
+        body: rows,
+        foot: [["", "", "", "Total", formatMoney(total)]],
+        theme: "plain",
+        margin: { left: MARGIN, right: MARGIN },
+        styles: { font: "helvetica", fontSize: 9, cellPadding: 6, textColor: [29, 43, 54], lineColor: [220, 214, 200] },
+        headStyles: { fontStyle: "bold", lineWidth: { bottom: 1 }, lineColor: [29, 43, 54] },
+        footStyles: { fontStyle: "bold", fillColor: false, textColor: [29, 43, 54], lineWidth: { top: 1 }, lineColor: [29, 43, 54] },
+        bodyStyles: { lineWidth: { bottom: 0.5 } },
+        columnStyles: { 4: { halign: "right" } },
+      });
+
+      // Category breakdown
+      let y = doc.lastAutoTable.finalY + 24;
+      if (categoryTotals.length > 1) {
+        if (y + 20 + categoryTotals.length * 14 > PAGE_H - MARGIN) {
+          doc.addPage();
+          y = MARGIN;
+        }
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(29, 43, 54);
+        doc.text("By Category", MARGIN, y);
+        y += 8;
+        doc.setDrawColor(29, 43, 54);
+        doc.setLineWidth(0.75);
+        doc.line(MARGIN, y, MARGIN + 140, y);
+        y += 16;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        for (const c of categoryTotals) {
+          doc.setTextColor(29, 43, 54);
+          doc.text(c.name, MARGIN, y);
+          doc.text(formatMoney(c.total), MARGIN + 140, y, { align: "right" });
+          y += 14;
+        }
+      }
+
+      // Receipt image appendix
+      const withImages = receipts.filter((r) => imageSrc(r.image));
+      if (withImages.length > 0) {
+        const loaded = await Promise.all(
+          withImages.map(async (r) => {
+            try {
+              const meta = await loadImageMeta(imageSrc(r.image));
+              return { ...r, ...meta };
+            } catch (e) {
+              console.error("Skipping image that failed to load for PDF:", r.vendor, e);
+              return null;
+            }
+          })
+        );
+        const usable = loaded.filter(Boolean);
+
+        if (usable.length > 0) {
+          doc.addPage();
+          let cursorY = MARGIN;
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(14);
+          doc.setTextColor(29, 43, 54);
+          doc.text("Receipt Images", MARGIN, cursorY);
+          cursorY += 22;
+
+          const cols = 3;
+          const gap = 14;
+          const cellW = (PAGE_W - MARGIN * 2 - gap * (cols - 1)) / cols;
+          const maxImgH = 150;
+          const rowH = maxImgH + 26;
+          let col = 0;
+
+          for (const item of usable) {
+            if (col === 0 && cursorY + rowH > PAGE_H - MARGIN) {
+              doc.addPage();
+              cursorY = MARGIN;
+            }
+            const x = MARGIN + col * (cellW + gap);
+            const { w, h } = fitDims(item.width, item.height, cellW, maxImgH);
+            const offsetX = x + (cellW - w) / 2;
+            doc.addImage(item.dataUrl, "JPEG", offsetX, cursorY, w, h);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(92, 107, 116);
+            doc.text(`${item.vendor} · ${formatMoney(item.amount)}`, x, cursorY + maxImgH + 12, { maxWidth: cellW });
+
+            col++;
+            if (col === cols) {
+              col = 0;
+              cursorY += rowH;
+            }
+          }
+        }
+      }
+
+      doc.save(`expense-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      console.error(err);
+      setExportError(err.message || "Could not generate the PDF.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   if (initialLoading) {
@@ -408,15 +573,24 @@ export default function App() {
         </div>
 
         <div className="action-bar">
+          {exportError && <div className="export-error">{exportError}</div>}
           <div className="action-bar-inner">
-            <button className="action-btn" onClick={handleExport} disabled={receipts.length === 0}>
-              <Download size={16} /> Export PDF
+            <button className="action-btn" onClick={handleExport} disabled={receipts.length === 0 || exporting}>
+              {exporting ? (
+                <>
+                  <Loader2 size={16} className="spin" /> Generating…
+                </>
+              ) : (
+                <>
+                  <Download size={16} /> Export PDF
+                </>
+              )}
             </button>
             <button className="action-btn action-btn-primary" onClick={openAdd}>
               <Camera size={16} /> Add Receipt
             </button>
-          </div>
         </div>
+      </div>
 
         {showModal && (
           <div className="modal-overlay" onClick={() => setShowModal(false)}>
@@ -520,84 +694,6 @@ export default function App() {
             onSave={saveGhConfig}
             onDisconnect={disconnectGh}
           />
-        )}
-      </div>
-
-      {/* ============ PRINT REPORT ============ */}
-      <div className="print-only">
-        <div className="print-header">
-          <h1>Expense Report</h1>
-          <div className="print-meta">
-            Generated {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
-            {periodStart && (
-              <>
-                {" "}
-                · Period {formatDateDisplay(periodStart)} – {formatDateDisplay(periodEnd)}
-              </>
-            )}
-          </div>
-        </div>
-
-        <table className="print-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Vendor</th>
-              <th>Category</th>
-              <th>Notes</th>
-              <th className="align-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {receipts
-              .slice()
-              .sort((a, b) => a.date.localeCompare(b.date))
-              .map((r) => (
-                <tr key={r.id}>
-                  <td className="mono">{formatDateDisplay(r.date)}</td>
-                  <td>{r.vendor}</td>
-                  <td>{r.category}</td>
-                  <td className="print-notes">{r.notes}</td>
-                  <td className="align-right mono">{formatMoney(r.amount)}</td>
-                </tr>
-              ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colSpan={4}>Total</td>
-              <td className="align-right mono">{formatMoney(total)}</td>
-            </tr>
-          </tfoot>
-        </table>
-
-        {categoryTotals.length > 1 && (
-          <div className="print-category-summary">
-            <h2>By Category</h2>
-            {categoryTotals.map((c) => (
-              <div key={c.name} className="print-category-row">
-                <span>{c.name}</span>
-                <span>{formatMoney(c.total)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {receipts.some((r) => imageSrc(r.image)) && (
-          <div className="print-images">
-            <h2>Receipt Images</h2>
-            <div className="print-images-grid">
-              {receipts
-                .filter((r) => imageSrc(r.image))
-                .map((r) => (
-                  <div key={r.id} className="print-image-item">
-                    <img src={imageSrc(r.image)} alt={r.vendor} />
-                    <div className="print-image-caption">
-                      {r.vendor} · {formatMoney(r.amount)}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
         )}
       </div>
     </div>
