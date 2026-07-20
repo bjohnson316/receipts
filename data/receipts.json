@@ -1,5 +1,14 @@
 [
   {
+    "id": "mrsntgjxnvjpu",
+    "vendor": "Texaco",
+    "amount": "66.00",
+    "category": "Fuel",
+    "date": "2026-07-20",
+    "notes": "",
+    "image": null
+  },
+  {
     "id": "mrsnszstmnkcq",
     "vendor": "McCalisters",
     "amount": "12",
