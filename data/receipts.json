@@ -1,5 +1,14 @@
 [
   {
+    "id": "mrsnszstmnkcq",
+    "vendor": "McCalisters",
+    "amount": "12",
+    "category": "Meals",
+    "date": "2026-07-20",
+    "notes": "",
+    "image": null
+  },
+  {
     "id": "mrsmb1hl03p5l",
     "vendor": "HEB",
     "amount": "48.63",
