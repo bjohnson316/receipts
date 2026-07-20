@@ -1,6 +1,6 @@
 # Receipt Ledger
 
-Capture receipts with your phone camera, catalog them by category, track a running total, and export an expense report to PDF (via the browser print dialog).
+Capture receipts with your phone camera, catalog them by category, track a running total, and export a real PDF expense report — generated directly in the browser, no print dialog involved, so it works the same on phones as on desktop.
 
 Receipt data and photos can be stored two ways:
 
@@ -49,5 +49,6 @@ Receipts are saved to `data/receipts.json` and photos to `images/` in the repo, 
 ## Notes
 
 - If you don't configure GitHub storage, receipts stay in the browser's `localStorage`, which is per-device and capped around 5–10MB.
-- "Export PDF" opens the browser print dialog with a clean, print-only report layout — choose **Save as PDF** as the destination.
+- "Export PDF" builds a real `.pdf` file client-side (via `jsPDF`) and downloads it directly — no print dialog, so it works reliably on mobile.
 - Camera capture uses `<input type="file" capture="environment">`, which opens the rear camera directly on most mobile browsers.
+- The app ships with a favicon and "Add to Home Screen" icons (`public/manifest.webmanifest`), so it looks and behaves like an installed app on both iOS and Android.
