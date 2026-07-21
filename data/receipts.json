@@ -1,5 +1,18 @@
 [
   {
+    "id": "mrtw15ryujmqn",
+    "vendor": "Rosa’s",
+    "amount": "11.10",
+    "category": "Meals",
+    "date": "2026-07-21",
+    "notes": "",
+    "image": {
+      "path": "images/mrtw15ryujmqn-1784592054142.jpg",
+      "sha": "b373602389465fe192f94c8dd1f109ffec2229fa",
+      "url": "https://raw.githubusercontent.com/bjohnson316/receipts/main/images/mrtw15ryujmqn-1784592054142.jpg"
+    }
+  },
+  {
     "id": "mrtdy0huk7thn",
     "vendor": "Vital Source",
     "amount": "58.43",
