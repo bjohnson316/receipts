@@ -1,5 +1,18 @@
 [
   {
+    "id": "mrwpea2ih3gc2",
+    "vendor": "Rudy’s BBQ",
+    "amount": "12.44",
+    "category": "Meals",
+    "date": "2026-07-22",
+    "notes": "",
+    "image": {
+      "path": "images/mrwpea2ih3gc2-1784762307451.jpg",
+      "sha": "9fe76ad982e5d6c18eebe16ca8c8694bd4291395",
+      "url": "https://raw.githubusercontent.com/bjohnson316/receipts/main/images/mrwpea2ih3gc2-1784762307451.jpg"
+    }
+  },
+  {
     "id": "mrvce1ykjofed",
     "vendor": "Five Guys",
     "amount": "13.09",
