@@ -1,5 +1,18 @@
 [
   {
+    "id": "mrvce1ykjofed",
+    "vendor": "Five Guys",
+    "amount": "13.09",
+    "category": "Meals",
+    "date": "2026-07-22",
+    "notes": "",
+    "image": {
+      "path": "images/mrvce1ykjofed-1784679995756.jpg",
+      "sha": "e0af816d34c8b3aaf7d9f185ea62a581fe25f326",
+      "url": "https://raw.githubusercontent.com/bjohnson316/receipts/main/images/mrvce1ykjofed-1784679995756.jpg"
+    }
+  },
+  {
     "id": "mrtw15ryujmqn",
     "vendor": "Rosa’s",
     "amount": "11.10",
