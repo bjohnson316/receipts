@@ -1,5 +1,18 @@
 [
   {
+    "id": "mry8ihp5c6rfc",
+    "vendor": "Texas Road House",
+    "amount": "29.14",
+    "category": "Meals",
+    "date": "2026-07-24",
+    "notes": "",
+    "image": {
+      "path": "images/mry8ihp5c6rfc-1784854882841.jpg",
+      "sha": "817b0778886e12b9f4a6726aa1e3bcf7b3047cc8",
+      "url": "https://raw.githubusercontent.com/bjohnson316/receipts/main/images/mry8ihp5c6rfc-1784854882841.jpg"
+    }
+  },
+  {
     "id": "mrwpea2ih3gc2",
     "vendor": "Rudy’s BBQ",
     "amount": "12.44",
